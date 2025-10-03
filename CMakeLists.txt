@@ -17,7 +17,10 @@ find_package(Qt6 COMPONENTS
 add_executable(Image_duplication_finder_C main.cpp
         main.cpp
         Image_duplication_finder_C.h
-        Image_duplication_finder_C.cpp)
+        Image_duplication_finder_C.cpp
+        scan_worker.h
+        scan_worker.cpp
+        search_methods.h)
 target_link_libraries(Image_duplication_finder_C
         Qt::Core
         Qt::Gui

@@ -13,7 +13,8 @@ int main(int argc, char *argv[])
 
     MainWindow window;
 
-    window.resize(450, 300);
+
+
     window.setWindowTitle("Duplicated image detector");
     window.show();
     return app.exec();

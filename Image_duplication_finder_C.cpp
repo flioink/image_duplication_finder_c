@@ -1,33 +1,32 @@
 
 #include "Image_duplication_finder_C.h" // current name of the project
+#include <qcoreapplication.h>
 #include <QLabel>
 #include <QPushButton>
 #include <QHBoxLayout>
 #include <QFileDialog>
 #include <QLineEdit>
 #include <QFileInfo>
-#include <QCryptographicHash>
 #include <QFile>
-#include <QDebug> // for printing results to console
-#include <QMap>
+#include <QDebug>
 #include <QProgressBar>
 #include <QGroupBox>
 #include <QRadiobutton>
-
-
-
-
+#include <QThread>
+#include "scan_worker.h"
 
 
 MainWindow::MainWindow(QWidget *parent) : QWidget(parent)
+, current_search_method(search_method::exact_match)
 {
     build_UI();
+    setFixedSize(500, 350);
 }
 
 void MainWindow::build_UI()
 {
     int browse_buttons_width = 90;
-    int text_boxes_width = 280;
+    int text_boxes_width = 300;
     //Source setup
     source_label = new QLabel("Source Path", this);
     source_edit = new QLineEdit(this);
@@ -46,7 +45,7 @@ void MainWindow::build_UI()
     scan_button = new QPushButton("Scan", this);
     scan_button->setObjectName("scanButton");
     scan_button->setProperty("class", "scan-button");
-    scan_button->setFixedWidth(200);
+    //scan_button->setFixedWidth(text_boxes_width + 30);
     scan_button->setFixedHeight(50);
     scan_button->setEnabled(false);
 
@@ -63,33 +62,73 @@ void MainWindow::build_UI()
     destination_layout->addWidget(dest_edit);
     destination_layout->addWidget(browse_destination_button);
 
-    QHBoxLayout* feedback_layout = new QHBoxLayout();
 
-    // Method layout
-    QHBoxLayout* method_layout = new QHBoxLayout();
+    //Scan button layout
+    QHBoxLayout* scan_button_layout = new QHBoxLayout();
+    scan_button_layout->addWidget(scan_button);
+
+    // Scan method group layout
+    QHBoxLayout* scan_method_layout = new QHBoxLayout();
     exact_match_radio = new QRadioButton("Exact Match");
     perceptual_hash_radio = new QRadioButton("Perceptual Hash");
     mean_color_radio = new QRadioButton("Mean Color");
-    method_layout->addWidget(exact_match_radio);
-    method_layout->addWidget(perceptual_hash_radio);
-    method_layout->addWidget(mean_color_radio);
-    QGroupBox* method_group = new QGroupBox("Search Method");
-    method_group->setLayout(method_layout);
+    scan_method_layout->addWidget(exact_match_radio);
+    scan_method_layout->addWidget(perceptual_hash_radio);
+    scan_method_layout->addWidget(mean_color_radio);
+    exact_match_radio->setChecked(true);
+    QGroupBox* scan_method_group = new QGroupBox("Search Method");
+    scan_method_group->setLayout(scan_method_layout);
 
-    //Scan layout
-    QHBoxLayout* scan_layout = new QHBoxLayout();
-    scan_layout->addWidget(scan_button);
+    // move method group layout
+    QHBoxLayout* move_method_layout = new QHBoxLayout();
+
+    move_all_radio = new QRadioButton("Move All");
+    move_all_except_one_radio = new QRadioButton("Move All But One");
+    move_method_layout->addWidget(move_all_radio);
+    move_method_layout->addWidget(move_all_except_one_radio);
+    move_all_radio->setChecked(true);
+    QGroupBox* move_method_group = new QGroupBox("Move Method");
+    move_method_group->setLayout(move_method_layout);
+
 
     // Feedback layout
+    QHBoxLayout* feedback_layout = new QHBoxLayout();
     QProgressBar* progress_bar = new QProgressBar(this); // progress bar
     feedback_layout->addWidget(progress_bar);
     progress_bar->setAlignment(Qt::AlignCenter);
     progress_bar->setMinimumWidth(100);
     progress_bar->setRange(0, 100);
-    progress_bar->setValue(50); // test
+    //progress_bar->setValue(50); // test
 
+    //Text feedback layout
+    QHBoxLayout* text_feedback_layout = new QHBoxLayout();
+    info_label = new QLabel("Test", this);
+    info_label->setAlignment(Qt::AlignCenter);
+    text_feedback_layout->addWidget(info_label);
+    info_label->setObjectName("textFeedback");
+    info_label->setProperty("class", "text-feedback");
+
+
+    //Adding to the master layout
+    master_layout->addLayout(source_layout); // add to master layout
+    master_layout->addLayout(destination_layout);
+    master_layout->addLayout(scan_button_layout);
+    master_layout->addWidget(move_method_group);
+    master_layout->addWidget(scan_method_group);
+    master_layout->addLayout(feedback_layout);
+    master_layout->addLayout(text_feedback_layout);
+
+    master_layout->setAlignment( Qt::AlignTop);
+
+    setLayout(master_layout);
+    connect_buttons();
+}
+
+// Connecting buttons to their methods here
+void MainWindow::connect_buttons()
+{
     //Browse source images folder section setup
-    connect(browse_source_button, &QPushButton::clicked, this, &MainWindow::on_browse_clicked);
+    connect(browse_source_button, &QPushButton::clicked, this, &MainWindow::on_browse_source_clicked);
     connect(source_edit, &QLineEdit::returnPressed, this, &MainWindow::on_source_path_entered);
 
     //Browse destination folder section setup
@@ -98,19 +137,20 @@ void MainWindow::build_UI()
 
     connect(scan_button, &QPushButton::clicked, this, &MainWindow::on_scan_clicked);
 
-    //Adding to the master layout
-    master_layout->addLayout(source_layout); // add to master layout
-    master_layout->addLayout(destination_layout);
-    master_layout->addLayout(scan_layout);
-    master_layout->addWidget(method_group);
-    master_layout->addLayout(feedback_layout);
+    // Connect search method the radio buttons
+    connect(exact_match_radio, &QRadioButton::toggled, this, &MainWindow::change_search_method);
+    connect(perceptual_hash_radio, &QRadioButton::toggled, this, &MainWindow::change_search_method);
+    connect(mean_color_radio, &QRadioButton::toggled, this, &MainWindow::change_search_method);
 
-    master_layout->setAlignment( Qt::AlignTop);
+    connect(move_all_radio, &QRadioButton::toggled, this, &MainWindow::change_move_method);
+    connect(move_all_except_one_radio, &QRadioButton::toggled, this, &MainWindow::change_move_method);
 
-    setLayout(master_layout);
+
+
+
 }
 
-void MainWindow::on_browse_clicked()
+void MainWindow::on_browse_source_clicked()
 {
     //take the output and put it in a QString
     QString folder = QFileDialog::getExistingDirectory(this, "Select a source folder");
@@ -215,31 +255,89 @@ void MainWindow::on_destination_clicked()
 
 }
 
-
-QString MainWindow::hashing(const QString& current_file)
+void MainWindow::update_scan_button_state()
 {
-    QFile file(current_file);
-    if (!file.open(QIODevice::ReadOnly))
+    if (!source_folder.isEmpty() && QFileInfo(source_folder).exists() && !destination_folder.isEmpty() &&
+        QFileInfo(destination_folder).exists())
     {
-        //do something to show error
-        qDebug("Failed to open file");
+        if (source_folder != destination_folder)
+        {
+            scan_button->setEnabled(true);
+        }
+
     }
 
-    const qint64 buffer_size = 4096;
-
-    QCryptographicHash hash(QCryptographicHash::Sha256);
-
-
-    while (!file.atEnd())
+    else // issues without the explicit else
     {
-        QByteArray chunk = file.read(buffer_size);
-        hash.addData(chunk);
+        scan_button->setEnabled(false);
+    }
+}
+
+void MainWindow::change_search_method()
+{
+    if (exact_match_radio->isChecked())
+    {
+        qDebug() << "Searching for exact match";
+        current_search_method = search_method::exact_match;
     }
 
-    QString digest = hash.result().toHex();
+    else if (perceptual_hash_radio->isChecked())
+    {
+        qDebug() << "Searching for perceptual hash";
+        current_search_method = search_method::perceptual_hash;
+    }
 
-    return digest;
+    else if (mean_color_radio->isChecked())
+    {
+        qDebug() << "Searching for mean_color";
+        current_search_method = search_method::mean_color;
+    }
 
+}
+
+void MainWindow::set_search_method_algorithm()
+{
+    switch(current_search_method) {
+        case search_method::exact_match:
+            qDebug() << "Searching for exact match";
+            //worker thread gets set here accordingly
+            break;
+        case search_method::perceptual_hash:
+            qDebug() << "Searching for perceptual hash";
+            break;
+        case search_method::mean_color:
+            qDebug() << "Searching for mean color";
+            break;
+    }
+
+}
+
+void MainWindow::change_move_method()
+{
+    if (move_all_radio->isChecked())
+    {
+        qDebug() << "Moving all files to destination";
+    }
+
+    else if (move_all_except_one_radio->isChecked())
+    {
+        qDebug() << "Moving all files except one to destination";
+    }
+
+}
+
+void MainWindow::update_progress_bar(int x)
+{
+    qDebug() << "Update called from thread:" << QThread::currentThread();
+    qDebug() << "Main window thread:" << this->thread();
+    qDebug() << "Progress bar thread:" << progress_bar->thread();
+
+    // Only update if we're in the main thread
+    if (QThread::currentThread() == this->thread()) {
+        progress_bar->setValue(x);
+    } else {
+        qDebug() << "Wrong thread - skipping UI update";
+    }
 }
 
 void MainWindow::load_file_paths()
@@ -265,62 +363,16 @@ void MainWindow::load_file_paths()
 
     qDebug() << "Found" << source_files.size() << "image files";
 
-
 }
 
 
 void MainWindow::on_scan_clicked()
 {
     load_file_paths();
-    QMap<QString, QStringList> hash_to_file_map;
+    qDebug() << "Starting scan with" << source_files.size() << "files";
 
-    QList<QString> results_map;
-
-    for (const QString& file_path : source_files )
-    {
-        QString digest = hashing(file_path);
-        hash_to_file_map[digest].append(file_path);
-
-    }
-
-    int index = 0;
-    for (auto it = hash_to_file_map.constBegin(); it != hash_to_file_map.constEnd(); it++)
-    {
-        index++ ;
-        if (it.value().size() > 1)
-        {
-            qDebug() << "Duplicate files for hash" << it.key() << ":" << it.value().size();
-
-            results_map.append(it.value());
-        }
-    }
-
-    qDebug() << index + 1 << "items scanned. Scan complete!";
-    qDebug() << results_map.size() << " results found";
+    // Create worker but use it directly (no threading)
+    ScanWorker worker(current_search_method, source_files);
+    worker.process(); // This runs in main thread
 
 }
-
-void MainWindow::update_scan_button_state()
-{
-    if (!source_folder.isEmpty() && QFileInfo(source_folder).exists() && !destination_folder.isEmpty() &&
-        QFileInfo(destination_folder).exists())
-    {
-        if (source_folder != destination_folder)
-        {
-            scan_button->setEnabled(true);
-        }
-
-    }
-
-    else // issues without the explicit else
-    {
-        scan_button->setEnabled(false);
-    }
-
-
-}
-
-
-
-
-
