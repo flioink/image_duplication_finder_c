@@ -76,33 +76,38 @@ void ScanWorker::process_exact_match()
 {
     QMap<QString, QStringList> hash_to_file_map;
 
-    // File processing loop
+    //Convert files to hashes and add to the file to hash map
     for (int i = 0; i < m_files.size(); ++i)
     {
         QString digest = hashing(m_files[i]);
         hash_to_file_map[digest].append(m_files[i]);
 
-        // Progress update
-        int progress = ((i + 1) * 100) / m_files.size();
+        //Progress update
+        int progress = ((i + 1) * 100) / m_files.size(); // calculate percentage
+
         emit progress_updated(progress);
     }
 
-    // Duplicate detection (AFTER the loop)
-    int index = 0;
-    QList<QString> results_map;
+    //Duplicate detection
+    QMap<QString, QStringList> results_map;
     for (auto it = hash_to_file_map.constBegin(); it != hash_to_file_map.constEnd(); it++)
         {
-            index++;
             if (it.value().size() > 1)
                 {
-                    qDebug() << "Duplicate files for hash" << it.key() << ":" << it.value().size();
-                    results_map.append(it.value());
+                    results_map[it.key()] = it.value();
                 }
-
         }
 
-    qDebug() << index + 1 << "items scanned. Scan complete!";
+
     qDebug() << results_map.size() << " results found";
+
     qDebug() << "Worker completed processing";
+
+    if (!results_map.isEmpty())
+    {
+        emit duplicates_found(results_map);
+    }
+
     emit process_finished();
 }
+

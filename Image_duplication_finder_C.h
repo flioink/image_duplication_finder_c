@@ -43,10 +43,12 @@ public slots:
 
 
 
+
 private:
     QStringList source_files;
     QString source_folder;
     QString destination_folder;
+    QString move_option;
     //enum
     search_method current_search_method;
 
@@ -76,6 +78,7 @@ private:
     void connect_buttons();
     void update_scan_button_state();
     void check_entered_text(QString& folder, const QString& location);
+    void handle_duplicates(const QMap<QString, QStringList>& duplicates);
 
 
 };

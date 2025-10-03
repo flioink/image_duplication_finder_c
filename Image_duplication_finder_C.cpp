@@ -21,12 +21,15 @@ MainWindow::MainWindow(QWidget *parent) : QWidget(parent)
 {
     build_UI();
     setFixedSize(500, 350);
+
+    move_option = "all";
 }
 
 void MainWindow::build_UI()
 {
     int browse_buttons_width = 90;
     int text_boxes_width = 300;
+
     //Source setup
     source_label = new QLabel("Source Path", this);
     source_edit = new QLineEdit(this);
@@ -358,16 +361,32 @@ void MainWindow::load_file_paths()
 }
 
 
+void MainWindow::handle_duplicates(const QMap<QString, QStringList>& duplicates)
+{
+
+    qDebug() << "Handling" << duplicates.size() + 1 << "duplicate groups";
+
+
+
+    for (auto it = duplicates.constBegin(); it != duplicates.constEnd(); ++it)
+        {
+            qDebug() << "Duplicate group - results:" << "Key: " << it.key() << "Values: " << *it;
+        }
+}
+
+
+
 void MainWindow::on_scan_clicked()
 {
     load_file_paths();
 
+    //Threading setup
     QThread* thread = new QThread;
-    ScanWorker* worker = new ScanWorker(current_search_method, source_files); // Remove 'this'
+    //Instantiate the worker
+    ScanWorker* worker = new ScanWorker(current_search_method, source_files);// pass in the search method and the source_files list
 
-    connect(worker, &ScanWorker::progress_updated,
-        this, &MainWindow::update_progress_bar,
-        Qt::QueuedConnection);
+    connect(worker, &ScanWorker::progress_updated, this, &MainWindow::update_progress_bar,
+        Qt::QueuedConnection); // connect the progress bar
 
     worker->moveToThread(thread);
 
@@ -376,12 +395,12 @@ void MainWindow::on_scan_clicked()
     connect(worker, &ScanWorker::process_finished, worker, &QObject::deleteLater);
     connect(thread, &QThread::finished, thread, &QObject::deleteLater);
 
-
-
     connect(worker, &ScanWorker::process_finished, this, [this]() {
         is_scanning = false;
         scan_button->setEnabled(true);
     });
+
+    connect(worker, &ScanWorker::duplicates_found, this, &MainWindow::handle_duplicates);
 
     thread->start();
     is_scanning = true;
