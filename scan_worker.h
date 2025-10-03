@@ -1,7 +1,7 @@
 
 #pragma once
-#include <QObject>
 #include "search_methods.h"
+#include "Image_duplication_finder_C.h"
 
 class ScanWorker : public QObject
 {
@@ -20,6 +20,8 @@ class ScanWorker : public QObject
     private:
     search_method m_method;
     QStringList m_files;
+
+    //MainWindow* m_main_window;
 
 
     void process_exact_match();

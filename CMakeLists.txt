@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 4.0)
 project(Image_duplication_finder_C)
 
 set(CMAKE_CXX_STANDARD 20)
+
+add_compile_options(-Wall -Wextra -Wshadow)
+
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)

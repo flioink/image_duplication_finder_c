@@ -36,6 +36,9 @@ private slots:
     void set_search_method_algorithm();
     void change_move_method();
 
+
+public slots:
+
     void update_progress_bar(int x);
 
 

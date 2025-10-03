@@ -93,7 +93,7 @@ void MainWindow::build_UI()
 
     // Feedback layout
     QHBoxLayout* feedback_layout = new QHBoxLayout();
-    QProgressBar* progress_bar = new QProgressBar(this); // progress bar
+    progress_bar = new QProgressBar(this); // progress bar
     feedback_layout->addWidget(progress_bar);
     progress_bar->setAlignment(Qt::AlignCenter);
     progress_bar->setMinimumWidth(100);
@@ -328,16 +328,8 @@ void MainWindow::change_move_method()
 
 void MainWindow::update_progress_bar(int x)
 {
-    qDebug() << "Update called from thread:" << QThread::currentThread();
-    qDebug() << "Main window thread:" << this->thread();
-    qDebug() << "Progress bar thread:" << progress_bar->thread();
-
-    // Only update if we're in the main thread
-    if (QThread::currentThread() == this->thread()) {
-        progress_bar->setValue(x);
-    } else {
-        qDebug() << "Wrong thread - skipping UI update";
-    }
+    qDebug() << "Progress: " << x << "%";
+    progress_bar->setValue(x);
 }
 
 void MainWindow::load_file_paths()
@@ -369,10 +361,29 @@ void MainWindow::load_file_paths()
 void MainWindow::on_scan_clicked()
 {
     load_file_paths();
-    qDebug() << "Starting scan with" << source_files.size() << "files";
 
-    // Create worker but use it directly (no threading)
-    ScanWorker worker(current_search_method, source_files);
-    worker.process(); // This runs in main thread
+    QThread* thread = new QThread;
+    ScanWorker* worker = new ScanWorker(current_search_method, source_files); // Remove 'this'
 
+    connect(worker, &ScanWorker::progress_updated,
+        this, &MainWindow::update_progress_bar,
+        Qt::QueuedConnection);
+
+    worker->moveToThread(thread);
+
+    connect(thread, &QThread::started, worker, &ScanWorker::process);
+    connect(worker, &ScanWorker::process_finished, thread, &QThread::quit);
+    connect(worker, &ScanWorker::process_finished, worker, &QObject::deleteLater);
+    connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+
+
+
+    connect(worker, &ScanWorker::process_finished, this, [this]() {
+        is_scanning = false;
+        scan_button->setEnabled(true);
+    });
+
+    thread->start();
+    is_scanning = true;
+    scan_button->setEnabled(false);
 }
