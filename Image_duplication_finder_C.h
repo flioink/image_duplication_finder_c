@@ -20,35 +20,25 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     QString hashing(const QString& current_file);
 
-
-
 private slots:
-
     void on_browse_source_clicked();
     void on_source_path_entered();
     void on_destination_clicked();
     void on_dest_path_entered();
-
     void load_file_paths();
     void on_scan_clicked();
-
     void change_search_method();
     void set_search_method_algorithm();
     void change_move_method();
-
-
-public slots:
-
+    void update_status_label(const QString& message);
     void update_progress_bar(int x);
-
-
-
 
 private:
     QStringList source_files;
     QString source_folder;
     QString destination_folder;
     QString move_option;
+    QString settings_file;
     //enum
     search_method current_search_method;
 
@@ -72,14 +62,12 @@ private:
     QRadioButton* move_all_radio;
 
     bool is_scanning = false;
-
-
     void build_UI();
     void connect_buttons();
     void update_scan_button_state();
     void check_entered_text(QString& folder, const QString& location);
     void handle_duplicates(const QMap<QString, QStringList>& duplicates);
-
+    void move_files(const QMap<QString, QStringList>& duplicates, bool all=true);
 
 };
 

@@ -6,6 +6,11 @@ QString set_styling();
 
 int main(int argc, char *argv[])
 {
+
+    // Set these BEFORE QApplication
+    QCoreApplication::setOrganizationName("flioink");
+    QCoreApplication::setApplicationName("Duplicated Images Finder");
+
     QApplication app(argc, argv);
 
     QString style = set_styling();

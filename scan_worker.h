@@ -16,6 +16,7 @@ class ScanWorker : public QObject
     void progress_updated(int percent);
     void process_finished();
     void duplicates_found(const QMap<QString, QStringList>& duplicates); // to return the resulting list
+    void status_update(const QString& message); // for the info label
 
     private:
     search_method m_method;
@@ -23,7 +24,11 @@ class ScanWorker : public QObject
 
     void process_exact_match();
     void process_perceptual_hash();
+
+    QString average_hash(const QImage &img);
+
     void process_mean_color();
+
     void load_file_paths();
 
     QString hashing(const QString &current_file);

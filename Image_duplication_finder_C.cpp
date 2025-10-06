@@ -13,6 +13,7 @@
 #include <QGroupBox>
 #include <QRadiobutton>
 #include <QThread>
+#include <QSettings>
 #include "scan_worker.h"
 
 
@@ -22,33 +23,54 @@ MainWindow::MainWindow(QWidget *parent) : QWidget(parent)
     build_UI();
     setFixedSize(500, 350);
 
+    update_scan_button_state();
+
     move_option = "all";
+
+    QSettings settings;
+    QString last_source = settings.value("source_folder", "").toString();
+    QString last_destination = settings.value("destination_folder", "").toString();
+
+    source_folder = last_source;
+    destination_folder = last_destination;
+
+    // Set your line edits
+    source_edit->setText(last_source);
+    dest_edit->setText(last_destination);
+
+    update_scan_button_state();
+
 }
 
 void MainWindow::build_UI()
 {
-    int browse_buttons_width = 90;
+    int browse_buttons_width = 85;
     int text_boxes_width = 300;
 
     //Source setup
     source_label = new QLabel("Source Path", this);
     source_edit = new QLineEdit(this);
+    source_edit->setToolTip("Enter source path and press Enter");
     source_edit->setFixedWidth(text_boxes_width);
     browse_source_button = new QPushButton("Source Folder", this);
     browse_source_button->setFixedWidth(browse_buttons_width); //lock button width
+    browse_source_button->setToolTip("Choose the folder to do the search in.");
 
     //Destination setup
     destination_label = new QLabel("Target Path", this);
     dest_edit = new QLineEdit(this);
+    dest_edit->setToolTip("Enter destination path and press Enter");
     dest_edit->setFixedWidth(text_boxes_width);
     browse_destination_button = new QPushButton("Target Folder", this);
     browse_destination_button->setFixedWidth(browse_buttons_width);
+    browse_destination_button->setToolTip("Choose the destination folder where the results will be moved.");
 
     //Scanning button setup
     scan_button = new QPushButton("Scan", this);
     scan_button->setObjectName("scanButton");
+    scan_button->setToolTip("Perform scan");
     scan_button->setProperty("class", "scan-button");
-    //scan_button->setFixedWidth(text_boxes_width + 30);
+    scan_button->setFixedWidth(text_boxes_width + 30);
     scan_button->setFixedHeight(50);
     scan_button->setEnabled(false);
 
@@ -70,11 +92,17 @@ void MainWindow::build_UI()
     QHBoxLayout* scan_button_layout = new QHBoxLayout();
     scan_button_layout->addWidget(scan_button);
 
-    // Scan method group layout
+    //Scan method group layout
     QHBoxLayout* scan_method_layout = new QHBoxLayout();
     exact_match_radio = new QRadioButton("Exact Match");
+    exact_match_radio->setToolTip("For finding exact copies of an image. Fast.");
+
     perceptual_hash_radio = new QRadioButton("Perceptual Hash");
+    perceptual_hash_radio->setToolTip("For finding similar looking images based on color. Slower.");
+
     mean_color_radio = new QRadioButton("Mean Color");
+    mean_color_radio->setToolTip("For finding mean color based on color.");
+
     scan_method_layout->addWidget(exact_match_radio);
     scan_method_layout->addWidget(perceptual_hash_radio);
     scan_method_layout->addWidget(mean_color_radio);
@@ -86,7 +114,9 @@ void MainWindow::build_UI()
     QHBoxLayout* move_method_layout = new QHBoxLayout();
 
     move_all_radio = new QRadioButton("Move All");
+    move_all_radio->setToolTip("Moves all files matching the search criteria into the destination folder.");
     move_all_except_one_radio = new QRadioButton("Move All But One");
+    move_all_except_one_radio->setToolTip("Moves all files matching the search criteria into the destination folder but leaves one in the original folder.");
     move_method_layout->addWidget(move_all_radio);
     move_method_layout->addWidget(move_all_except_one_radio);
     move_all_radio->setChecked(true);
@@ -94,19 +124,20 @@ void MainWindow::build_UI()
     move_method_group->setLayout(move_method_layout);
 
 
-    // Feedback layout
-    QHBoxLayout* feedback_layout = new QHBoxLayout();
+    //Progress bar layout
+    QHBoxLayout* progress_bar_layout = new QHBoxLayout();
     progress_bar = new QProgressBar(this); // progress bar
-    feedback_layout->addWidget(progress_bar);
+    progress_bar_layout->addWidget(progress_bar);
     progress_bar->setAlignment(Qt::AlignCenter);
     progress_bar->setMinimumWidth(100);
     progress_bar->setRange(0, 100);
-    //progress_bar->setValue(50); // test
+
 
     //Text feedback layout
     QHBoxLayout* text_feedback_layout = new QHBoxLayout();
-    info_label = new QLabel("Test", this);
+    info_label = new QLabel("Results display", this);
     info_label->setAlignment(Qt::AlignCenter);
+    info_label->setToolTip("The results of any search will appear here.");
     text_feedback_layout->addWidget(info_label);
     info_label->setObjectName("textFeedback");
     info_label->setProperty("class", "text-feedback");
@@ -118,7 +149,7 @@ void MainWindow::build_UI()
     master_layout->addLayout(scan_button_layout);
     master_layout->addWidget(move_method_group);
     master_layout->addWidget(scan_method_group);
-    master_layout->addLayout(feedback_layout);
+    master_layout->addLayout(progress_bar_layout);
     master_layout->addLayout(text_feedback_layout);
 
     master_layout->setAlignment( Qt::AlignTop);
@@ -127,7 +158,7 @@ void MainWindow::build_UI()
     connect_buttons();
 }
 
-// Connecting buttons to their methods here
+//Connecting buttons to their methods here
 void MainWindow::connect_buttons()
 {
     //Browse source images folder section setup
@@ -163,6 +194,10 @@ void MainWindow::on_browse_source_clicked()
 
         this->source_folder = folder;
         source_edit->setText(folder);
+
+        QSettings settings;
+        settings.setValue("source_folder", folder);
+
         update_scan_button_state();
 
     }
@@ -184,6 +219,13 @@ void MainWindow::on_source_path_entered()
     QString folder = source_edit->text();
     check_entered_text(folder, "source");
 
+    //Save if entered path is valid
+    if (!source_folder.isEmpty() && QFileInfo(source_folder).exists())
+    {
+        QSettings settings;
+        settings.setValue("source_folder", source_folder);
+    }
+
     update_scan_button_state();
 
 }
@@ -192,6 +234,14 @@ void MainWindow::on_dest_path_entered()
 {
     QString folder = dest_edit->text();
     check_entered_text(folder, "dest");
+
+    //Save if entered path is valid
+    if (!destination_folder.isEmpty() && QFileInfo(destination_folder).exists())
+    {
+        QSettings settings;
+        settings.setValue("destination_folder", destination_folder);
+    }
+
 
     update_scan_button_state();
 
@@ -215,6 +265,7 @@ void MainWindow::check_entered_text(QString& folder, const QString& location)// 
         {
             this->destination_folder = absolute_path;
             dest_edit->setText(absolute_path);
+
         }
     }
 
@@ -246,6 +297,11 @@ void MainWindow::on_destination_clicked()
     {
         this->destination_folder = folder;
         dest_edit->setText(folder);
+
+        // SAVE THE PATH
+        QSettings settings;
+        settings.setValue("destination_folder", folder);
+
         update_scan_button_state();
     }
 
@@ -266,6 +322,11 @@ void MainWindow::update_scan_button_state()
         if (source_folder != destination_folder)
         {
             scan_button->setEnabled(true);
+        }
+
+        else // issues without the explicit else
+        {
+            scan_button->setEnabled(false);
         }
 
     }
@@ -320,23 +381,26 @@ void MainWindow::change_move_method()
     if (move_all_radio->isChecked())
     {
         qDebug() << "Moving all files to destination";
+        move_option = "all";
     }
 
     else if (move_all_except_one_radio->isChecked())
     {
         qDebug() << "Moving all files except one to destination";
+        move_option = "one";
     }
 
 }
 
 void MainWindow::update_progress_bar(int x)
 {
-    qDebug() << "Progress: " << x << "%";
+    //qDebug() << "Progress: " << x << "%";
     progress_bar->setValue(x);
 }
 
 void MainWindow::load_file_paths()
 {
+    update_status_label("Loading files...");
 
     qDebug() << "Loading file paths";
     source_files.clear();  // Clearing the current list of urls
@@ -347,7 +411,8 @@ void MainWindow::load_file_paths()
         qDebug() << "Source folder does not exist!";
     }
 
-    QStringList filters = {"*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.tiff"};
+    //File types
+    QStringList filters = {"*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.tiff", "*.webp"};
 
     QStringList files = dir.entryList(filters, QDir::Files);
 
@@ -364,19 +429,81 @@ void MainWindow::load_file_paths()
 void MainWindow::handle_duplicates(const QMap<QString, QStringList>& duplicates)
 {
 
-    qDebug() << "Handling" << duplicates.size() + 1 << "duplicate groups";
+    qDebug() << "Handling" << duplicates.size() << "duplicate groups";
 
-
-
-    for (auto it = duplicates.constBegin(); it != duplicates.constEnd(); ++it)
-        {
-            qDebug() << "Duplicate group - results:" << "Key: " << it.key() << "Values: " << *it;
-        }
+    if (move_option == "all")
+    {
+        move_files(duplicates);
+    }
+    else
+    {
+        move_files(duplicates, false);
+    }
 }
 
 
+void MainWindow::move_files(const QMap<QString, QStringList>& duplicates, bool all)
+{
+    //iterating through the resulting list of duplicates
+    for (auto it = duplicates.constBegin(); it != duplicates.constEnd(); it++)
+    {
+        const QStringList& files = it.value();
 
-void MainWindow::on_scan_clicked()
+        if (all)
+        {
+            for (const QString& source_file: it.value())
+            {
+                QFileInfo file_info(source_file);
+                // building destination path
+                QString destination_path = QDir(destination_folder).filePath(file_info.fileName());
+
+                qDebug() << "Moving:" << source_file << "to" << destination_path;
+
+                bool success = QFile::rename(source_file, destination_path);
+
+                if (success)
+                {
+                    qDebug() << "Successfully moved file";
+                }
+                else
+                {
+                    qDebug() << "Failed to move file:" << source_file;
+                }
+            }
+        }
+
+        else
+        {
+            for (int i = 1; i < files.size(); i++)
+            {
+                QFileInfo file_info(files[i]);
+                // building destination path
+                QString destination_path = QDir(destination_folder).filePath(file_info.fileName());
+
+                qDebug() << "Moving:" << files[i] << "to" << destination_path;
+
+                bool success = QFile::rename(files[i], destination_path);
+
+                if (success)
+                {
+                    qDebug() << "Successfully moved file";
+                }
+                else
+                {
+                    qDebug() << "Failed to move file:" << files[i];
+                }
+
+            }
+        }
+    }
+}
+
+void MainWindow::update_status_label(const QString& message)
+{
+    info_label->setText(message);
+}
+
+void MainWindow::on_scan_clicked()//connect(sender, &SenderClass::signalName, receiver, &ReceiverClass::slotName);
 {
     load_file_paths();
 
@@ -402,7 +529,11 @@ void MainWindow::on_scan_clicked()
 
     connect(worker, &ScanWorker::duplicates_found, this, &MainWindow::handle_duplicates);
 
+    connect(worker, &ScanWorker::status_update, this, &MainWindow::update_status_label);
+
     thread->start();
     is_scanning = true;
     scan_button->setEnabled(false);
 }
+
+

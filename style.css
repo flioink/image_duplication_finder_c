@@ -24,8 +24,18 @@ QPushButton:disabled {
 QPushButton.scan-button {
     font-size: 16px;
     font-weight: bold;
+    background-color: #375e8b;
+
+}
+QPushButton.scan-button:hover
+{
+    background-color: #5288c6;
 }
 
+QPushButton.scan-button:disabled
+{
+    background-color: #304f6e;
+}
 
 QLineEdit {
     background-color: #353535;
@@ -65,7 +75,7 @@ QRadioButton::indicator:checked {
 }
 
 QLabel.text-feedback{
-    font-size: 24px;
+    font-size: 20px;
     font-weight: bold;
 }
 
