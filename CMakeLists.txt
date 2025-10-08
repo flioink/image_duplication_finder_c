@@ -5,10 +5,14 @@ set(CMAKE_CXX_STANDARD 20)
 
 add_compile_options(-Wall -Wextra -Wshadow)
 
+set(CMAKE_TOOLCHAIN_FILE "C:/vcpkg/scripts/buildsystems/vcpkg.cmake")# chain
+
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_PREFIX_PATH "C:\\Qt_for_cpp\\6.9.2\\mingw_64")
+
+
 
 
 find_package(Qt6 COMPONENTS
@@ -17,7 +21,7 @@ find_package(Qt6 COMPONENTS
         Widgets
         REQUIRED)
 
-add_executable(Image_duplication_finder_C main.cpp
+add_executable(Image_duplication_finder_C WIN32
         main.cpp
         Image_duplication_finder_C.h
         Image_duplication_finder_C.cpp
@@ -29,6 +33,14 @@ target_link_libraries(Image_duplication_finder_C
         Qt::Gui
         Qt::Widgets
 )
+
+
+
+target_include_directories(Image_duplication_finder_C PRIVATE
+        "C:/vcpkg/installed/x64-mingw-dynamic/include/opencv4"
+)
+
+
 
 if (WIN32 AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     set(DEBUG_SUFFIX)

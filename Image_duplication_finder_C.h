@@ -10,6 +10,7 @@ class QPushButton;
 class QListWidget;
 class QProgressBar;
 class QRadioButton;
+class QGroupBox;
 
 
 class MainWindow : public QWidget
@@ -60,6 +61,9 @@ private:
     QRadioButton* mean_color_radio;
     QRadioButton* move_all_except_one_radio;
     QRadioButton* move_all_radio;
+
+    QGroupBox* move_method_group;
+    QGroupBox* scan_method_group;
 
     bool is_scanning = false;
     void build_UI();

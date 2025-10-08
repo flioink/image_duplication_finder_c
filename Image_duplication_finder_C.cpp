@@ -107,7 +107,7 @@ void MainWindow::build_UI()
     scan_method_layout->addWidget(perceptual_hash_radio);
     scan_method_layout->addWidget(mean_color_radio);
     exact_match_radio->setChecked(true);
-    QGroupBox* scan_method_group = new QGroupBox("Search Method");
+    scan_method_group = new QGroupBox("Search Method");
     scan_method_group->setLayout(scan_method_layout);
 
     // move method group layout
@@ -120,7 +120,7 @@ void MainWindow::build_UI()
     move_method_layout->addWidget(move_all_radio);
     move_method_layout->addWidget(move_all_except_one_radio);
     move_all_radio->setChecked(true);
-    QGroupBox* move_method_group = new QGroupBox("Move Method");
+    move_method_group = new QGroupBox("Move Method");
     move_method_group->setLayout(move_method_layout);
 
 
@@ -331,7 +331,7 @@ void MainWindow::update_scan_button_state()
 
     }
 
-    else // issues without the explicit else
+    else
     {
         scan_button->setEnabled(false);
     }
@@ -525,6 +525,8 @@ void MainWindow::on_scan_clicked()//connect(sender, &SenderClass::signalName, re
     connect(worker, &ScanWorker::process_finished, this, [this]() {
         is_scanning = false;
         scan_button->setEnabled(true);
+        move_method_group->setEnabled(true);
+        scan_method_group->setEnabled(true);
     });
 
     connect(worker, &ScanWorker::duplicates_found, this, &MainWindow::handle_duplicates);
@@ -534,6 +536,9 @@ void MainWindow::on_scan_clicked()//connect(sender, &SenderClass::signalName, re
     thread->start();
     is_scanning = true;
     scan_button->setEnabled(false);
+    move_method_group->setEnabled(false);
+    scan_method_group->setEnabled(false);
+
 }
 
 

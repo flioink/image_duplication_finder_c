@@ -1,9 +1,9 @@
 #include "scan_worker.h"
 #include <QDir>
 #include <QCryptographicHash>
-#include <QThread>
-#include <QCoreApplication>
 #include <QException>
+#include <QImageReader>
+//#include <opencv2/opencv.hpp>
 
 
 
@@ -35,10 +35,7 @@ void ScanWorker::process()
     // qDebug() << "Worker::process() completed";
 }
 
-void ScanWorker::process_mean_color()
-{
 
-}
 
 QString ScanWorker::hashing(const QString &current_file)
 {
@@ -130,9 +127,6 @@ void ScanWorker::process_perceptual_hash()
         {
             QImage img(m_files[i]);
 
-            // Progress update
-
-
             if (img.isNull())
             {
                 qDebug() << "Failed to load image " << m_files[i];
@@ -142,9 +136,12 @@ void ScanWorker::process_perceptual_hash()
 
             img = img.convertToFormat(QImage::Format_RGB888);
 
-            QString img_hash = average_hash(img);
+            QString img_hash = calculate_average_hash(img);
 
             img_hashes_map[img_hash].append(m_files[i]);
+            QString current_number = QString::number(i + 1);
+            status = "Checking file " + current_number + " out of " + QString::number(m_files.size());
+            emit status_update(status);
 
 
         }
@@ -184,14 +181,14 @@ void ScanWorker::process_perceptual_hash()
 
 }
 
-QString ScanWorker::average_hash(const QImage& img)
+QString ScanWorker::calculate_average_hash(const QImage& img)
 {
     if (img.isNull())
     {
         return QString(); //Return empty hash for null images
     }
 
-    qint32 kernel = 32;
+    qint32 kernel = 64;
     QImage small = img.scaled(kernel, kernel, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 
     qint64 total = 0;
@@ -228,4 +225,111 @@ QString ScanWorker::average_hash(const QImage& img)
     }
 
     return hash;
+}
+
+QString ScanWorker::calculate_mean_hash(const QImage& img)
+{
+    QImage img_result = img.scaled(64, 64, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+
+    qint32 total_red = 0, total_green = 0, total_blue = 0;
+
+
+    for (int y = 0; y < img_result.height(); ++y)
+    {
+        for (int x = 0; x < img_result.width(); ++x)
+        {
+            QColor color = img_result.pixelColor(x, y);
+
+            total_red += color.red();
+            total_green += color.green();
+            total_blue += color.blue();
+        }
+    }
+
+    qint32 mean_red = total_red / (64*64);
+    qint32 mean_green = total_green / (64*64);
+    qint32 mean_blue = total_blue / (64*64);
+
+    QString mean_hash_value = QString("%1%2%3")
+    .arg(mean_red, 2, 16, QLatin1Char('0'))
+    .arg(mean_green, 2, 16, QLatin1Char('0'))
+    .arg(mean_blue, 2, 16, QLatin1Char('0'));
+
+    return mean_hash_value;
+
+}
+
+void ScanWorker::process_mean_color()
+{
+    QMap<QString, QStringList> img_hashes_map;
+
+    QString status;
+
+    for (int i = 0; i < m_files.size(); ++i)
+    {
+        int progress = ((i + 1) * 100) / m_files.size();
+        emit progress_updated(progress);
+
+        try
+        {
+            QImage img(m_files[i]);
+
+            if (img.isNull())
+            {
+                qDebug() << "Failed to load image " << m_files[i];
+                QImageReader reader(m_files[i]);
+                qDebug() << "Format:" << reader.format();
+                qDebug() << "Error:" << reader.errorString();
+                qDebug() << "Size:" << QFileInfo(m_files[i]).size();
+
+                continue;
+
+            }
+
+            img = img.convertToFormat(QImage::Format_RGB888);
+
+            QString img_hash = calculate_mean_hash(img);
+
+            img_hashes_map[img_hash].append(m_files[i]);
+
+            QString current_number = QString::number(i + 1);
+            status = "Checking file " + current_number + " out of " + QString::number(m_files.size());
+            emit status_update(status);
+
+
+        }
+        catch (const QException& e)
+        {
+            qDebug() << e.what();
+        }
+
+    }
+
+    //Duplicate detection
+    int result_counter = 0;
+    QMap<QString, QStringList> results_map;
+    for (auto it = img_hashes_map.constBegin(); it != img_hashes_map.constEnd(); it++)
+    {
+        if (it.value().size() > 1)
+        {
+            results_map[it.key()] = it.value();
+            result_counter+= it.value().size();
+        }
+    }
+
+    if (!results_map.isEmpty())
+    {
+        emit duplicates_found(results_map);
+
+        status = "Visually similar images found: " + QString::number(result_counter);
+        emit status_update(status);
+    }
+    else
+    {
+        status = "No matching images found.";
+        emit status_update(status);
+    }
+
+    emit process_finished();
+
 }
